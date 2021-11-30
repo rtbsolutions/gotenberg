@@ -75,6 +75,7 @@ func (mod LibreOffice) Routes() ([]api.Route, error) {
 
 	return []api.Route{
 		convertRoute(mod.unoconv, mod.engine),
+		convertRouteDoc(mod.unoconv, mod.engine),
 	}, nil
 }
 

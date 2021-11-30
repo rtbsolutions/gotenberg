@@ -50,6 +50,7 @@ type Options struct {
 // See https://github.com/unoconv/unoconv.
 type API interface {
 	PDF(ctx context.Context, logger *zap.Logger, inputPath, outputPath string, options Options) error
+	Doc(ctx context.Context, logger *zap.Logger, inputPath, outputPath string, options Options) error
 	Extensions() []string
 }
 
@@ -157,6 +158,113 @@ func (mod Unoconv) PDF(ctx context.Context, logger *zap.Logger, inputPath, outpu
 		fmt.Sprintf("%d", port),
 		"--format",
 		"pdf",
+	}
+
+	checkedEntry := logger.Check(zap.DebugLevel, "check for debug level before setting high verbosity")
+	if checkedEntry != nil {
+		args = append(args, "-vvv")
+	}
+
+	if options.Landscape {
+		args = append(args, "--printer", "PaperOrientation=landscape")
+	}
+
+	if options.PageRanges != "" {
+		args = append(args, "--export", fmt.Sprintf("PageRange=%s", options.PageRanges))
+	}
+
+	if options.PDFArchive {
+		args = append(args, "--export", "SelectPdfVersion=1")
+	}
+
+	args = append(args, "--output", outputPath, inputPath)
+
+	cmd, err := gotenberg.CommandContext(ctx, logger, mod.binPath, args...)
+	if err != nil {
+		return fmt.Errorf("create unoconv command: %w", err)
+	}
+
+	logger.Debug(fmt.Sprintf("print to PDF with: %+v", options))
+
+	activeInstancesCountMu.Lock()
+	activeInstancesCount += 1
+	activeInstancesCountMu.Unlock()
+
+	err = cmd.Exec()
+
+	activeInstancesCountMu.Lock()
+	activeInstancesCount -= 1
+	activeInstancesCountMu.Unlock()
+
+	// Always remove the user profile directory created by LibreOffice.
+	// See https://github.com/gotenberg/gotenberg/issues/192.
+	go func() {
+		logger.Debug(fmt.Sprintf("remove user profile directory '%s'", userProfileDirPath))
+
+		err := os.RemoveAll(userProfileDirPath)
+		if err != nil {
+			logger.Error(fmt.Sprintf("remove user profile directory: %s", err))
+		}
+	}()
+
+	if err == nil {
+		return nil
+	}
+
+	// Unoconv/LibreOffice errors are not explicit.
+	// That's why we have to make an educated guess according to the exit code
+	// and given inputs.
+
+	if strings.Contains(err.Error(), "exit status 5") && options.PageRanges != "" {
+		return ErrMalformedPageRanges
+	}
+
+	// Possible errors:
+	// 1. Unoconv/LibreOffice failed for some reason.
+	// 2. Context done.
+	//
+	// On the second scenario, LibreOffice might not had time to remove some of
+	// its temporary files, as it has been killed without warning. The garbage
+	// collector will delete them for us (if the module is loaded).
+	return fmt.Errorf("unoconv PDF: %w", err)
+}
+
+func (mod Unoconv) Doc(ctx context.Context, logger *zap.Logger, inputPath, outputPath string, options Options) error {
+	port, err := func() (int, error) {
+		listener, err := net.Listen("tcp", "127.0.0.1:0")
+		if err != nil {
+			return 0, fmt.Errorf("listen on the local network address: %w", err)
+		}
+		defer func() {
+			err := listener.Close()
+			if err != nil {
+				logger.Error(fmt.Sprintf("close listener: %s", err.Error()))
+			}
+		}()
+
+		addr := listener.Addr().String()
+
+		_, portStr, err := net.SplitHostPort(addr)
+		if err != nil {
+			return 0, fmt.Errorf("get free port from host: %w", err)
+		}
+
+		return strconv.Atoi(portStr)
+	}()
+
+	if err != nil {
+		return fmt.Errorf("get free port: %w", err)
+	}
+
+	userProfileDirPath := gotenberg.NewDirPath()
+
+	args := []string{
+		"--user-profile",
+		fmt.Sprintf("//%s", userProfileDirPath),
+		"--port",
+		fmt.Sprintf("%d", port),
+		"--format",
+		"doc",
 	}
 
 	checkedEntry := logger.Check(zap.DebugLevel, "check for debug level before setting high verbosity")
