@@ -6,8 +6,8 @@ help: ## Show the help
 it: build build-tests ## Initialize the development environment
 
 GOLANG_VERSION=1.17
-DOCKER_REPOSITORY=registry.gitlab.com/rtbdev/tracku
-GOTENBERG_VERSION=snapshot
+DOCKER_REPOSITORY=gitlab.rtbsolutions.pro:5050/rtbdev/tracemetric/gotenberg
+GOTENBERG_VERSION=latest
 GOTENBERG_USER_GID=1001
 GOTENBERG_USER_UID=1001
 NOTO_COLOR_EMOJI_VERSION=v2.028 # See https://github.com/googlefonts/noto-emoji/releases.
