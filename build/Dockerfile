@@ -147,6 +147,9 @@ RUN \
 # Copy the Gotenberg binary from the builder stage.
 COPY --from=builder /home/gotenberg /usr/bin/
 
+# copy local fonts
+COPY build/fonts/* /usr/local/share/fonts/
+
 # Environment variables required by modules or else.
 ENV GC_EXCLUDE_SUBSTR "hsperfdata_root,hsperfdata_gotenberg"
 ENV CHROMIUM_BIN_PATH /usr/bin/chromium
