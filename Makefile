@@ -6,7 +6,7 @@ help: ## Show the help
 it: build build-tests ## Initialize the development environment
 
 GOLANG_VERSION=1.17
-DOCKER_REPOSITORY=gitlab.rtbsolutions.pro:5050/tracemetric/devops/gotenberg
+DOCKER_REPOSITORY=gitlab.rtbsolutions.pro:5050/tracemetric/devops
 GOTENBERG_VERSION=latest
 GOTENBERG_USER_GID=1001
 GOTENBERG_USER_UID=1001
